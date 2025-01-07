@@ -1,0 +1,4 @@
+I want to create a mern web app in which there will be an organizational managment tree structure.
+for example at first if no entity is present the webpage must be empty And there is an add button which will have two fields name and designation now after submitting the data gets arranged in hierarchal order means ceo first then comes manager then comes hod then comes supervisor then comes worker note ceo must be one.
+
+So for this    
