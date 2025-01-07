@@ -2,20 +2,13 @@ import React, { useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { fetchEntities, addEntity } from '../redux/entitySlice';
 import { Button } from 'primereact/button';
-import { InputText } from 'primereact/inputtext';
-import { Dropdown } from 'primereact/dropdown';
 import { OrganizationChart } from 'primereact/organizationchart';
+import AddEntityForm from './AddEntityForm'; // Import the new form component
 
 const EntityTree = () => {
   const dispatch = useDispatch();
-
-  // Redux state
   const { entities, status, error } = useSelector((state) => state.entities);
-
-  // Local state for form inputs
-  const [name, setName] = useState('');
-  const [designation, setDesignation] = useState('');
-  const [parentId, setParentId] = useState(null);
+  const [isFormVisible, setIsFormVisible] = useState(false); // State to toggle form visibility
 
   const entityOptions = ['CEO', 'Manager', 'HOD', 'Supervisor', 'Worker']; // Options for designation dropdown
 
@@ -27,22 +20,11 @@ const EntityTree = () => {
   }, [status, dispatch]);
 
   // Handle form submission to add a new entity
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-
-    if (!name || !designation) {
-      console.log('Name and Designation are required.');
-      return;
-    }
-
-    const newEntity = { name, designation, parentId };
-
+  const handleAddEntity = async (newEntity) => {
     try {
       await dispatch(addEntity(newEntity));
       console.log('Entity added successfully!');
-      setName('');
-      setDesignation('');
-      setParentId(null); // Reset form
+      setIsFormVisible(false); // Close form after submission
     } catch (err) {
       console.log('Error adding entity.', err);
     }
@@ -73,63 +55,79 @@ const EntityTree = () => {
   };
 
   return (
-    <div className="container mx-auto p-6">
-      <div className="flex justify-center mb-6">
-        <h2 className="text-3xl font-semibold">Organizational Structure</h2>
-      </div>
-
+    <div className="container mx-auto p-6 bg-gray-50 min-h-screen">
       {/* Organization Chart */}
-      {status === 'loading' && <div className="flex justify-center text-lg font-semibold">Loading...</div>}
-      {status === 'failed' && <div className="text-red-500 font-semibold">{error}</div>}
+      {status === 'loading' && (
+        <div className="flex justify-center text-lg font-semibold text-blue-600">
+          <p>Loading organization chart...</p>
+        </div>
+      )}
+      {status === 'failed' && (
+        <div className="flex justify-center text-lg font-semibold text-red-500">
+          <p>Error: {error}</p>
+        </div>
+      )}
       {status === 'succeeded' && entities && entities.length > 0 && (
         <div className="flex justify-center mb-6">
-          <OrganizationChart value={prepareChartData(entities)} />
+          <div className="w-full max-w-5xl p-4 bg-white rounded-lg shadow-lg">
+            <OrganizationChart value={prepareChartData(entities)} />
+          </div>
         </div>
       )}
       {status === 'succeeded' && entities && entities.length === 0 && (
-        <div className="flex justify-center text-lg font-semibold text-gray-600">No entities found</div>
+        <div className="flex justify-center text-lg font-semibold text-gray-600">
+          <p>No entities found</p>
+        </div>
       )}
 
-      {/* Add New Entity Form */}
-      <div className="bg-white p-6 rounded-lg shadow-lg max-w-lg mx-auto">
-        <h3 className="text-xl font-semibold mb-4">Add New Entity</h3>
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <div>
-            <label className="block text-gray-700">Name</label>
-            <InputText
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Enter name"
-              className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-          <div>
-            <label className="block text-gray-700">Designation</label>
-            <Dropdown
-              value={designation}
-              options={entityOptions}
-              onChange={(e) => setDesignation(e.value)}
-              placeholder="Select Designation"
-              className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-          <div>
-            <label className="block text-gray-700">Parent Entity (Optional)</label>
-            <Dropdown
-              value={parentId}
-              options={entities.map((entity) => ({
-                label: `${entity.name} (${entity.designation})`,
-                value: entity._id,
-              }))}
-              onChange={(e) => setParentId(e.value)}
-              placeholder="Select Parent Entity"
-              className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-
-          <Button type="submit" label="Add Entity" className="w-full mt-6 p-button p-button-rounded p-button-primary" />
-        </form>
+      {/* Add New Entity Button */}
+      <div className="flex justify-center mt-6">
+        <Button
+          label="Add New Entity"
+          icon="pi pi-plus"
+          className="p-button p-button-rounded p-button-success p-button-lg"
+          onClick={() => setIsFormVisible(true)} // Show the form when clicked
+        />
       </div>
+
+      {/* Conditionally Render AddEntityForm */}
+      {isFormVisible && (
+        <div
+          className="fixed z-50 inset-0 overflow-y-auto"
+          aria-labelledby="modal-title"
+          role="dialog"
+          aria-modal="true"
+        >
+          <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+            <div
+              className="fixed inset-0 bg-black bg-opacity-50 transition-opacity"
+              aria-hidden="true"
+              onClick={() => setIsFormVisible(false)} // Close modal when clicking on backdrop
+            ></div>
+
+            <span
+              className="hidden sm:inline-block sm:align-middle sm:h-screen"
+              aria-hidden="true"
+            >
+              &#8203;
+            </span>
+
+            <div className="inline-block align-bottom bg-white dark:bg-black/80 dark:text-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+              <div className="bg-white dark:bg-black/80 dark:text-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                <AddEntityForm
+                  entityOptions={entityOptions}
+                  entities={entities}
+                  onSubmit={(newEntity) => {
+                    handleAddEntity(newEntity);
+                    setIsFormVisible(false); // Close form after submission
+                  }}
+                  onCancel={() => setIsFormVisible(false)} // Close modal when cancel is clicked
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
