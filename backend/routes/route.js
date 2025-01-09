@@ -2,13 +2,17 @@ const express = require('express');
 const router = express.Router();
 const {
     getEntity,
-    postEntity
+    postEntity,
+    getParent
 } = require('../controllers/entity.controllers')
 
-// Route for getting car details
+// Route for getting entity details
 router.get("/entities", getEntity);
 
-// Route for posting car details
+// Route for getting parent entity details
+router.get("/parent", getParent);
+
+// Route for posting entity details
 router.post("/entities", postEntity);
 
 module.exports = router;

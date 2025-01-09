@@ -2,3 +2,180 @@ I want to create a mern web app in which there will be an organizational managme
 for example at first if no entity is present the webpage must be empty And there is an add button which will have two fields name and designation now after submitting the data gets arranged in hierarchal order means ceo first then comes manager then comes hod then comes supervisor then comes worker note ceo must be one.
 
 So for this    
+
+
+import React, { useState } from 'react';
+
+const AddEntityForm = ({ entityOptions, entities, onSubmit, onCancel }) => {
+  const [name, setName] = useState('');
+  const [designation, setDesignation] = useState('');
+  const [parentId, setParentId] = useState(null);
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+
+    if (!name || !designation) {
+      console.log('Name and Designation are required.');
+      return;
+    }
+
+    const newEntity = { name, designation, parentId };
+    onSubmit(newEntity); // Pass the new entity to the parent
+    setName(''); // Reset the form
+    setDesignation('');
+    setParentId(null);
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <h3 className="text-2xl font-bold text-gray-900 mb-6 text-center">Add New Entity</h3>
+
+      <div className="space-y-2">
+        <label className="text-sm font-medium text-gray-700">
+          Name <span className="text-red-500">*</span>
+        </label>
+        <input
+          type="text"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="Enter name"
+          className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+          required
+        />
+      </div>
+
+      <div className="space-y-2">
+        <label className="text-sm font-medium text-gray-700">
+          Designation <span className="text-red-500">*</span>
+        </label>
+        <select
+          value={designation}
+          onChange={(e) => setDesignation(e.target.value)}
+          className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none bg-white"
+          required
+        >
+          <option value="">Select Designation</option>
+          {entityOptions.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <div className="space-y-2">
+        <label className="text-sm font-medium text-gray-700">
+          Parent Entity <span className="text-gray-400 text-xs ml-2">(Optional)</span>
+        </label>
+        <select
+          value={parentId || ''}
+          onChange={(e) => setParentId(e.target.value)}
+          className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none bg-white"
+        >
+          <option value="">Select Parent Entity</option>
+          {entities.map((entity) => (
+            <option key={entity._id} value={entity._id}>
+              {`${entity.name} (${entity.designation})`}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <div className="flex gap-4 pt-6">
+        <button
+          type="submit"
+          className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-medium py-2.5 px-4 rounded-lg transition duration-200"
+        >
+          Add Entity
+        </button>
+        <button
+          type="button"
+          onClick={onCancel}
+          className="flex-1 bg-white hover:bg-gray-50 text-gray-700 font-medium py-2.5 px-4 border border-gray-300 rounded-lg transition duration-200"
+        >
+          Cancel
+        </button>
+      </div>
+    </form>
+  );
+};
+
+export default AddEntityForm;
+
+
+To get all names from both parents and their children, you'll need to modify the query to include all entities regardless of their parent status. Here's how you can do it:
+
+exports.getParent = async (req, res) => {
+    try {
+        // This will find all entities in the database
+        const allEntities = await Entity.find({})
+            .select('name -_id')
+            .lean()
+            .then(results => results.map(doc => doc.name));
+
+        res.status(200).json(allEntities);
+    } catch (error) {
+        console.error("Error fetching entities:", error.message);
+        res.status(500).json({
+            message: "An error occurred while retrieving entities. Please try again later.",
+            error: error.message
+        });
+    }
+}
+
+Copy
+
+Insert at cursor
+javascript
+This will return an array of all names in your database, like:
+
+[
+    "John Doe",          // CEO
+    "Jane Smith",        // Manager
+    "Bob Johnson",       // Head of Department
+    "Alice Williams",    // Shift Supervisor
+    "Charlie Brown"      // Worker
+    // ... all other names
+]
+
+Copy
+
+Insert at cursor
+javascript
+If you want to maintain the hierarchy information while getting the names, you could do:
+
+exports.getParent = async (req, res) => {
+    try {
+        const allEntities = await Entity.find({})
+            .select('name parent designation -_id')
+            .lean();
+
+        res.status(200).json(allEntities);
+    } catch (error) {
+        console.error("Error fetching entities:", error.message);
+        res.status(500).json({
+            message: "An error occurred while retrieving entities. Please try again later.",
+            error: error.message
+        });
+    }
+}
+
+Copy
+
+Insert at cursor
+javascript
+This will return something like:
+
+[
+    {
+        "name": "John Doe",
+        "designation": "CEO",
+        "parent": null
+    },
+    {
+        "name": "Jane Smith",
+        "designation": "Manager",
+        "parent": "677f52ed0e9cad4678a0fd9f"
+    },
+    // ... all other entities with their relationships
+]

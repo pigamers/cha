@@ -2,14 +2,14 @@ const Entity = require('../models/entity.models');
 
 exports.getEntity = async (req, res) => {
     try {
-        // Fetch all entities, populate children, and sort by designation for hierarchy
-        const entities = await Entity.find().populate('children').sort({ designation: 1 });
+        // Use the new getHierarchicalData method we created in the model
+        const hierarchicalData = await Entity.getHierarchicalData();
 
-        if (!entities || entities.length === 0) {
+        if (!hierarchicalData || hierarchicalData.length === 0) {
             return res.status(404).json({ message: "No entities found in the database." });
         }
 
-        res.status(200).json(entities);
+        res.status(200).json(hierarchicalData);
     } catch (error) {
         console.error("Error fetching entities:", error.message);
         res.status(500).json({
@@ -20,90 +20,129 @@ exports.getEntity = async (req, res) => {
 }
 
 exports.postEntity = async (req, res) => {
-  const { name, designation, parentId } = req.body;
+    const { name, designation, parent, expanded = true } = req.body; // Changed parentId to parent
 
-  // Ensure required fields are provided
-  if (!name || !designation) {
-    return res.status(400).json({
-      message: "Name and designation are required fields."
-    });
-  }
+    console.log('Received request body:', req.body); // Debug log
 
-  try {
-    // Prevent adding more than one CEO
-    if (designation === "CEO") {
-      const existingCEO = await Entity.findOne({ designation: "CEO" });
-      if (existingCEO) {
+    // Ensure required fields are provided
+    if (!name || !designation) {
         return res.status(400).json({
-          message: "There can only be one CEO. An entity with the 'CEO' designation already exists."
+            message: "Name and designation are required fields."
         });
-      }
     }
 
-    // Validate if parentId is provided and if parent entity exists
-    let parentEntity = null;
-    if (parentId) {
-      parentEntity = await Entity.findById(parentId);
-      if (!parentEntity) {
-        return res.status(404).json({
-          message: "Parent entity not found. Please provide a valid parent ID."
-        });
-      }
+    try {
+        // Prevent multiple names
+        
+        // Prevent adding more than one CEO
+        if (designation === "CEO") {
+            const existingCEO = await Entity.findOne({ designation: "CEO" });
+            if (existingCEO) {
+                return res.status(400).json({
+                    message: "There can only be one CEO. An entity with the 'CEO' designation already exists."
+                });
+            }
+        }
 
-      console.log('Parent Entity:', parentEntity); // Debugging
+        // Validate if parent is provided and if parent entity exists
+        let parentEntity = null;
+        if (parent) { // Changed parentId to parent
+            parentEntity = await Entity.findById(parent); // Changed parentId to parent
+            if (!parentEntity) {
+                return res.status(404).json({
+                    message: "Parent entity not found. Please provide a valid parent ID."
+                });
+            }
 
-      // Check if the parent is of correct designation to accept a child
-      if (parentEntity.designation === "CEO" && designation !== "Manager") {
-        return res.status(400).json({
-          message: "Only Managers can be added under the CEO."
+            // Validate hierarchy
+            const hierarchyValidation = validateHierarchy(parentEntity.designation, designation);
+            if (!hierarchyValidation.isValid) {
+                return res.status(400).json({
+                    message: hierarchyValidation.message
+                });
+            }
+        }
+
+        // Create a new entity with expanded property
+        const newEntity = new Entity({
+            name,
+            designation,
+            parent: parent || null, // Changed parentId to parent
+            expanded,
+            children: []
         });
-      }
-      if (parentEntity.designation === "Manager" && designation !== "Head of the Department") {
-        return res.status(400).json({
-          message: "Only Head of the Department can be added under Managers."
+
+        console.log('Creating new entity:', newEntity); // Debug log
+
+        // Save the new entity to the database
+        await newEntity.save();
+
+        // If the entity has a parent, add this entity to the parent's 'children' array
+        if (parent && parentEntity) { // Changed parentId to parent
+            await Entity.findByIdAndUpdate(parent, { // Changed parentId to parent
+                $push: { children: newEntity._id }
+            });
+        }
+
+        // Fetch the updated hierarchical data
+        const updatedHierarchy = await Entity.getHierarchicalData();
+
+        res.status(201).json({
+            message: "Entity created successfully.",
+            entity: newEntity,
+            updatedHierarchy
         });
-      }
-      if (parentEntity.designation === "Head of the Department" && designation !== "Shift Supervisor") {
-        return res.status(400).json({
-          message: "Only Shift Supervisors can be added under Heads of the Department."
+    } catch (error) {
+        console.error("Error creating entity:", error);
+        res.status(500).json({
+            message: "An error occurred while creating the entity. Please try again later.",
+            error: error.message
         });
-      }
-      if (parentEntity.designation === "Shift Supervisor" && designation !== "Worker") {
-        return res.status(400).json({
-          message: "Only Workers can be added under Shift Supervisors."
-        });
-      }
     }
-
-    // Create a new entity
-    const newEntity = new Entity({
-      name,
-      designation,
-      parent: parentId || null
-    });
-
-    // Save the new entity to the database
-    await newEntity.save();
-
-    // If the entity has a parent, add this entity to the parent's 'children' array
-    if (parentId && parentEntity) {
-      await Entity.findByIdAndUpdate(parentId, {
-        $push: { children: newEntity._id }
-      });
-    }
-
-    res.status(201).json({
-      message: "Entity created successfully.",
-      entity: newEntity
-    });
-  } catch (error) {
-    console.error("Error creating entity:", error);
-    res.status(500).json({
-      message: "An error occurred while creating the entity. Please try again later.",
-      error: error.message
-    });
-  }
 };
+
+
+// Helper function to validate hierarchy
+function validateHierarchy(parentDesignation, childDesignation) {
+    const hierarchyRules = {
+        "CEO": ["Manager"],
+        "Manager": ["Head of the Department"],
+        "Head of the Department": ["Shift Supervisor"],
+        "Shift Supervisor": ["Worker"],
+        "Worker": []
+    };
+
+    const allowedChildren = hierarchyRules[parentDesignation] || [];
+    const isValid = allowedChildren.includes(childDesignation);
+
+    return {
+        isValid,
+        message: isValid ?
+            "Valid hierarchy" :
+            `Only ${allowedChildren.join(", ")} can be added under ${parentDesignation}.`
+    };
+}
+
+exports.getParent = async (req, res) => {
+    try {
+        // This will find all entities in the database
+        const allEntities = await Entity.find({})
+            .select('name _id') // Remove the minus sign before _id to include it
+            .lean()
+            .then(results => results.map(doc => ({
+                _id: doc._id,
+                name: doc.name
+            })));
+
+        res.status(200).json(allEntities);
+    } catch (error) {
+        console.error("Error fetching entities:", error.message);
+        res.status(500).json({
+            message: "An error occurred while retrieving entities. Please try again later.",
+            error: error.message
+        });
+    }
+}
 
 
 

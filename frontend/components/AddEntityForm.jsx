@@ -1,97 +1,152 @@
-import React, { useState } from 'react';
-import { Button } from 'primereact/button';
-import { InputText } from 'primereact/inputtext';
-import { Dropdown } from 'primereact/dropdown';
+import React, { useState, useEffect } from 'react';
+import { useDispatch, useSelector } from 'react-redux';
+import { fetchParents, addEntity } from '../redux/entitySlice';
 
-const AddEntityForm = ({ entityOptions, entities, onSubmit, onCancel }) => {
-  const [name, setName] = useState('');
-  const [designation, setDesignation] = useState('');
-  const [parentId, setParentId] = useState(null);
+export default function AddEntityForm({ onClose }) {
+  const dispatch = useDispatch();
+  const parents = useSelector((state) => state.entities.parentEntities);
 
-  // Handle form submission
-  const handleSubmit = (e) => {
-    e.preventDefault();
+  const [formData, setFormData] = useState({
+    name: '',
+    designation: '',
+    parent: '' // Initialize parent as empty string
+  });
 
-    if (!name || !designation) {
-      console.log('Name and Designation are required.');
-      return;
-    }
+  // Log the form data whenever it changes
+  useEffect(() => {
+    console.log('Current form data:', formData);
+  }, [formData]);
 
-    const newEntity = { name, designation, parentId };
-    onSubmit(newEntity);
-    setName('');
-    setDesignation('');
-    setParentId(null); // Reset form
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    console.log('Handle change:', { name, value }); // Debug log
+    setFormData(prevState => ({
+      ...prevState,
+      [name]: value
+    }));
   };
 
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+
+    // Create the entity data object
+    const entityData = {
+      name: formData.name,
+      designation: formData.designation,
+      parent: formData.parent || null // If parent is empty string, convert to null
+    };
+
+    console.log('Submitting entity data:', entityData); // Debug log
+
+    try {
+      await dispatch(addEntity(entityData)).unwrap();
+      onClose();
+      window.location.reload();
+    } catch (error) {
+      console.error('Failed to add entity:', error);
+    }
+  };
+
+  useEffect(() => {
+    dispatch(fetchParents());
+  }, [dispatch]);
+
   return (
-    <div className="relative p-4 w-full max-w-md max-h-full">
-      <div className="relative bg-white rounded-lg shadow dark:bg-gray-700">
-        {/* Close Button */}
-        <button
-          onClick={onCancel}
-          className="absolute top-3 right-3 text-gray-400 bg-transparent hover:bg-gray-200 hover:text-gray-900 rounded-lg text-sm w-8 h-8 inline-flex justify-center items-center dark:hover:bg-gray-600 dark:hover:text-white"
-        >
-          <svg className="w-3 h-3" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 14 14">
-            <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m1 1 6 6m0 0 6 6M7 7l6-6M7 7l-6 6"/>
-          </svg>
-          <span className="sr-only">Close modal</span>
-        </button>
+    <div className="fixed font-mono inset-0 bg-black bg-opacity-50 backdrop-blur-sm flex items-center justify-center w-full min-h-screen">
+      <div className="bg-white p-8 rounded-lg shadow-lg mx-auto" onClick={(e) => e.stopPropagation()}>
+        <h1 className="font-bold text-2xl text-gray-800 text-center my-4">
+          Add a New Entity Here!
+        </h1>
 
-        <div className="p-4 md:p-5 text-center">
-          <h3 className="text-xl font-semibold mb-4">Add New Entity</h3>
-          <form onSubmit={handleSubmit} className="space-y-6">
-            <div>
-              <label className="block text-gray-700">Name</label>
-              <InputText
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="Enter name"
-                className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-            <div>
-              <label className="block text-gray-700">Designation</label>
-              <Dropdown
-                value={designation}
-                options={entityOptions}
-                onChange={(e) => setDesignation(e.value)}
-                placeholder="Select Designation"
-                className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-            <div>
-              <label className="block text-gray-700">Parent Entity (Optional)</label>
-              <Dropdown
-                value={parentId}
-                options={entities.map((entity) => ({
-                  label: `${entity.name} (${entity.designation})`,
-                  value: entity._id,
-                }))}
-                onChange={(e) => setParentId(e.value)}
-                placeholder="Select Parent Entity"
-                className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
+        <form className="space-y-6" onSubmit={handleSubmit}>
+          {/* Name input */}
+          <div className='my-4'>
+            <label
+              htmlFor="name"
+              className="block text-sm font-medium text-gray-700 mb-2"
+            >
+              Name -
+            </label>
+            <input
+              type="text"
+              id="name"
+              name="name"
+              value={formData.name}
+              onChange={handleChange}
+              className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              placeholder="Enter name"
+              required
+            />
+          </div>
 
-            <div className="flex justify-between mt-6">
-              <Button
-                type="submit"
-                label="Add Entity"
-                className="w-full p-button p-button-rounded p-button-primary"
-              />
-              <Button
-                type="button"
-                label="Cancel"
-                onClick={onCancel}
-                className="w-full p-button p-button-rounded p-button-secondary"
-              />
-            </div>
-          </form>
-        </div>
+          {/* Designation select */}
+          <div className='my-4'>
+            <label
+              htmlFor="designation"
+              className="block text-sm font-medium text-gray-700 mb-2"
+            >
+              Designation -
+            </label>
+            <select
+              id="designation"
+              name="designation"
+              value={formData.designation}
+              onChange={handleChange}
+              className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              required
+            >
+              <option value="">Select a designation</option>
+              <option value="CEO">CEO</option>
+              <option value="Manager">Manager</option>
+              <option value="Head of the Department">Head of the Department</option>
+              <option value="Shift Supervisor">Shift Supervisor</option>
+              <option value="Worker">Worker</option>
+            </select>
+          </div>
+
+          {/* Parent select */}
+          <div className='my-4'>
+            <label
+              htmlFor="parent"
+              className="block text-sm font-medium text-gray-700 mb-2"
+            >
+              Parent -
+            </label>
+            <select
+              id="parent"
+              name="parent"
+              value={formData.parent}
+              onChange={handleChange}
+              className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              required={formData.designation !== 'CEO'} // Only required if not CEO
+            >
+              <option value="">Select a parent</option>
+              {parents && parents.map((parent) => (
+                <option key={parent._id} value={parent._id}>
+                  {parent.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Buttons */}
+          <div className="flex items-center justify-center gap-5 my-6">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 text-sm font-medium text-white bg-red-400 hover:bg-red-500 rounded-md"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+            >
+              Submit
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   );
-};
-
-export default AddEntityForm;
+}
